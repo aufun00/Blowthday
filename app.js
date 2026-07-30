@@ -192,6 +192,155 @@ class MicrophoneDiagnostics {
   }
 }
 
+class CharacterArtwork {
+  constructor(source) {
+    this.canvas = null;
+    const image = new Image();
+    image.decoding = "async";
+    image.addEventListener("load", () => this.prepare(image), { once: true });
+    image.src = source;
+  }
+
+  prepare(image) {
+    const scale = Math.min(1, 640 / image.naturalWidth);
+    const width = Math.round(image.naturalWidth * scale);
+    const height = Math.round(image.naturalHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(image, 0, 0, width, height);
+    const pixels = ctx.getImageData(0, 0, width, height);
+    const data = pixels.data;
+    const visited = new Uint8Array(width * height);
+    const queue = new Int32Array(width * height);
+    let head = 0;
+    let tail = 0;
+
+    const isBackground = (pixel) => {
+      const offset = pixel * 4;
+      return data[offset] + data[offset + 1] + data[offset + 2] < 300;
+    };
+    const enqueue = (pixel) => {
+      if (visited[pixel] || !isBackground(pixel)) return;
+      visited[pixel] = 1;
+      queue[tail++] = pixel;
+    };
+
+    for (let x = 0; x < width; x += 1) {
+      enqueue(x);
+      enqueue((height - 1) * width + x);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      enqueue(y * width);
+      enqueue(y * width + width - 1);
+    }
+
+    while (head < tail) {
+      const pixel = queue[head++];
+      data[pixel * 4 + 3] = 0;
+      const x = pixel % width;
+      if (x > 0) enqueue(pixel - 1);
+      if (x < width - 1) enqueue(pixel + 1);
+      if (pixel >= width) enqueue(pixel - width);
+      if (pixel < width * (height - 1)) enqueue(pixel + width);
+    }
+
+    ctx.putImageData(pixels, 0, 0);
+    this.canvas = canvas;
+  }
+
+  draw(ctx, centerX, topY, maxWidth, maxHeight) {
+    if (!this.canvas) return;
+    const scale = Math.min(maxWidth / this.canvas.width, maxHeight / this.canvas.height);
+    const width = this.canvas.width * scale;
+    const height = this.canvas.height * scale;
+    ctx.drawImage(this.canvas, centerX - width / 2, topY, width, height);
+  }
+}
+
+class BirthdaySong {
+  constructor() {
+    this.nodes = [];
+    this.master = null;
+    this.timer = 0;
+    this.finish = null;
+  }
+
+  play(context) {
+    this.stop();
+    const beat = 60 / 128;
+    const melody = [
+      [67, 0.75], [67, 0.25], [69, 1], [67, 1], [72, 1], [71, 2],
+      [67, 0.75], [67, 0.25], [69, 1], [67, 1], [74, 1], [72, 2],
+      [67, 0.75], [67, 0.25], [79, 1], [76, 1], [72, 1], [71, 1], [69, 2],
+      [77, 0.75], [77, 0.25], [76, 1], [72, 1], [74, 1], [72, 2]
+    ];
+    const master = context.createGain();
+    master.gain.setValueAtTime(0.72, context.currentTime);
+    master.connect(context.destination);
+    this.master = master;
+    let cursor = context.currentTime + 0.12;
+
+    for (const [midi, beats] of melody) {
+      const duration = beats * beat;
+      const sounding = Math.max(0.08, duration * 0.88);
+      const frequency = 440 * Math.pow(2, (midi - 69) / 12);
+      const envelope = context.createGain();
+      const harmonicGain = context.createGain();
+      const fundamental = context.createOscillator();
+      const harmonic = context.createOscillator();
+
+      fundamental.type = "triangle";
+      fundamental.frequency.setValueAtTime(frequency, cursor);
+      harmonic.type = "sine";
+      harmonic.frequency.setValueAtTime(frequency * 2, cursor);
+      harmonicGain.gain.setValueAtTime(0.13, cursor);
+      envelope.gain.setValueAtTime(0.0001, cursor);
+      envelope.gain.exponentialRampToValueAtTime(0.095, cursor + 0.018);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, cursor + sounding);
+
+      fundamental.connect(envelope);
+      harmonic.connect(harmonicGain).connect(envelope);
+      envelope.connect(master);
+      fundamental.start(cursor);
+      harmonic.start(cursor);
+      fundamental.stop(cursor + sounding + 0.02);
+      harmonic.stop(cursor + sounding + 0.02);
+      this.nodes.push(fundamental, harmonic, envelope, harmonicGain);
+      cursor += duration;
+    }
+
+    return new Promise((resolve) => {
+      this.finish = resolve;
+      this.timer = window.setTimeout(() => this.complete(true), Math.max(0, (cursor - context.currentTime + 0.24) * 1000));
+    });
+  }
+
+  complete(completed) {
+    window.clearTimeout(this.timer);
+    this.timer = 0;
+    const resolve = this.finish;
+    this.finish = null;
+    for (const node of this.nodes) {
+      if (typeof node.stop === "function") {
+        try { node.stop(); } catch {}
+      }
+      try { node.disconnect(); } catch {}
+    }
+    this.nodes = [];
+    if (this.master) {
+      try { this.master.disconnect(); } catch {}
+      this.master = null;
+    }
+    if (resolve) resolve(completed);
+  }
+
+  stop() {
+    if (this.finish || this.nodes.length) this.complete(false);
+  }
+}
+
 class BirthdayScene {
   constructor(canvas, onAllExtinguished) {
     this.canvas = canvas;
@@ -206,6 +355,7 @@ class BirthdayScene {
     this.extinguishBudget = 0;
     this.blowVisual = 0;
     this.lastFrame = performance.now();
+    this.characters = new CharacterArtwork("./raying.jpeg");
     this.palette = ["#ed625f", "#f5a14d", "#e78fb3", "#6bbab0", "#8875c8", "#f2c84b"];
 
     this.resize = this.resize.bind(this);
@@ -374,7 +524,7 @@ class BirthdayScene {
     const radiusX = Math.min(this.width * 0.39, 310);
     const radiusY = Math.max(48, radiusX * 0.29);
     const centerX = this.width / 2;
-    const cakeHeight = clamp(this.height * 0.16, 78, 142);
+    const cakeHeight = clamp(this.height * 0.2, 108, 172);
     const latestTop = this.height - cakeHeight - radiusY - 42;
     const topY = Math.max(this.height * 0.42, Math.min(this.height * 0.64, latestTop));
     return { centerX, topY, radiusX, radiusY, cakeHeight };
@@ -408,8 +558,8 @@ class BirthdayScene {
 
     const plateEdge = ctx.createLinearGradient(0, plateY - ry * 0.55, 0, plateY + ry * 0.55);
     plateEdge.addColorStop(0, "#fffdf8");
-    plateEdge.addColorStop(0.52, "#f8e8df");
-    plateEdge.addColorStop(1, "#dcbeb8");
+    plateEdge.addColorStop(0.52, "#f3e9d8");
+    plateEdge.addColorStop(1, "#cdbb9b");
     ctx.fillStyle = plateEdge;
     ctx.beginPath();
     ctx.ellipse(x, plateY, rx * 1.19, ry * 0.6, 0, 0, Math.PI * 2);
@@ -417,14 +567,14 @@ class BirthdayScene {
 
     const plateFace = ctx.createRadialGradient(x - rx * 0.25, plateY - ry * 0.25, 0, x, plateY, rx * 1.12);
     plateFace.addColorStop(0, "#ffffff");
-    plateFace.addColorStop(0.72, "#fff9f1");
-    plateFace.addColorStop(1, "#ead5cf");
+    plateFace.addColorStop(0.72, "#fffaf0");
+    plateFace.addColorStop(1, "#e3d5bd");
     ctx.fillStyle = plateFace;
     ctx.beginPath();
     ctx.ellipse(x, plateY - 4, rx * 1.1, ry * 0.43, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(178, 137, 132, 0.24)";
+    ctx.strokeStyle = "rgba(156, 130, 91, 0.24)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.ellipse(x, plateY - 4, rx * 1.03, ry * 0.34, 0, 0, Math.PI * 2);
@@ -441,32 +591,30 @@ class BirthdayScene {
     side.closePath();
 
     const body = ctx.createLinearGradient(0, y, 0, y + h);
-    body.addColorStop(0, "#f5aaa0");
-    body.addColorStop(0.5, "#ec7d78");
-    body.addColorStop(1, "#c94c58");
+    body.addColorStop(0, "#ead8b5");
+    body.addColorStop(0.5, "#d8ba83");
+    body.addColorStop(1, "#b8894c");
     ctx.fillStyle = body;
     ctx.fill(side);
 
     ctx.save();
     ctx.clip(side);
 
-    const creamBand = ctx.createLinearGradient(0, y + h * 0.43, 0, y + h * 0.68);
-    creamBand.addColorStop(0, "#f4c0ae");
-    creamBand.addColorStop(0.18, "#ffe9d7");
-    creamBand.addColorStop(0.72, "#fbd9c3");
-    creamBand.addColorStop(1, "#dc776f");
-    ctx.fillStyle = creamBand;
-    ctx.fillRect(x - rx, y + h * 0.45, rx * 2, h * 0.2);
-
-    ctx.fillStyle = "rgba(173, 49, 64, 0.48)";
-    ctx.fillRect(x - rx, y + h * 0.61, rx * 2, Math.max(2, h * 0.035));
+    ctx.fillStyle = "rgba(255, 248, 224, 0.16)";
+    for (let index = 0; index < 56; index += 1) {
+      const tx = x - rx + ((index * 83) % 197) / 197 * rx * 2;
+      const ty = y + 8 + ((index * 47) % 101) / 101 * (h - 4);
+      ctx.beginPath();
+      ctx.arc(tx, ty, index % 3 === 0 ? 1.1 : 0.65, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const sideShade = ctx.createLinearGradient(x - rx, 0, x + rx, 0);
-    sideShade.addColorStop(0, "rgba(96, 39, 50, 0.22)");
-    sideShade.addColorStop(0.18, "rgba(255, 255, 255, 0.08)");
-    sideShade.addColorStop(0.5, "rgba(255, 255, 255, 0.18)");
+    sideShade.addColorStop(0, "rgba(81, 57, 28, 0.24)");
+    sideShade.addColorStop(0.18, "rgba(255, 255, 255, 0.1)");
+    sideShade.addColorStop(0.5, "rgba(255, 255, 255, 0.2)");
     sideShade.addColorStop(0.84, "rgba(255, 255, 255, 0.02)");
-    sideShade.addColorStop(1, "rgba(91, 34, 45, 0.25)");
+    sideShade.addColorStop(1, "rgba(78, 49, 18, 0.27)");
     ctx.fillStyle = sideShade;
     ctx.fillRect(x - rx, y, rx * 2, h + ry);
 
@@ -478,21 +626,23 @@ class BirthdayScene {
       ctx.fillStyle = sideGlow;
       ctx.fillRect(x - rx, y, rx * 2, h + ry);
     }
+
+    this.characters.draw(ctx, x, y + ry * 0.78, rx * 1.42, h * 0.94);
     ctx.restore();
 
     const topEdge = ctx.createLinearGradient(0, y - ry, 0, y + ry);
-    topEdge.addColorStop(0, "#fffdf6");
-    topEdge.addColorStop(0.64, "#f9e4d8");
-    topEdge.addColorStop(1, "#dca49f");
+    topEdge.addColorStop(0, "#fbf3df");
+    topEdge.addColorStop(0.64, "#e7d2aa");
+    topEdge.addColorStop(1, "#b99358");
     ctx.fillStyle = topEdge;
     ctx.beginPath();
     ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
 
     const glaze = ctx.createRadialGradient(x - rx * 0.28, y - ry * 0.46, 5, x, y, rx);
-    glaze.addColorStop(0, "#ffffff");
-    glaze.addColorStop(0.56, "#fffaf1");
-    glaze.addColorStop(1, "#f3d7cf");
+    glaze.addColorStop(0, "#fffdf6");
+    glaze.addColorStop(0.56, "#f6ead0");
+    glaze.addColorStop(1, "#d8bd8a");
     ctx.fillStyle = glaze;
     ctx.beginPath();
     ctx.ellipse(x, y - 3, rx * 0.94, ry * 0.84, 0, 0, Math.PI * 2);
@@ -513,57 +663,13 @@ class BirthdayScene {
       ctx.restore();
     }
 
-    const decorationCount = this.candles.length > 50 ? 12 : 24;
-    const sprinkleColors = ["#db5b62", "#e9a542", "#67aaa3", "#9478bd"];
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-    ctx.lineCap = "round";
-    ctx.lineWidth = 2.2;
-    for (let index = 0; index < decorationCount; index += 1) {
-      const radius = Math.sqrt((index + 0.7) / decorationCount) * 0.74;
-      const angle = index * goldenAngle + 0.4;
-      const sx = x + Math.cos(angle) * radius * rx;
-      const sy = y - 3 + Math.sin(angle) * radius * ry * 0.72;
-      ctx.strokeStyle = sprinkleColors[index % sprinkleColors.length];
-      ctx.beginPath();
-      ctx.moveTo(sx - Math.cos(angle * 1.7) * 2.3, sy - Math.sin(angle * 1.7) * 1.4);
-      ctx.lineTo(sx + Math.cos(angle * 1.7) * 2.3, sy + Math.sin(angle * 1.7) * 1.4);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = "rgba(135, 102, 55, 0.26)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(x, y - 3, rx * 0.84, ry * 0.69, 0, 0, Math.PI * 2);
+    ctx.stroke();
 
-    ctx.fillStyle = "#fff8ea";
-    const dripXs = [-0.78, -0.51, -0.2, 0.15, 0.49, 0.78];
-    const dripFactors = [0.2, 0.38, 0.25, 0.42, 0.3, 0.18];
-    dripXs.forEach((position, index) => {
-      const dx = x + rx * position;
-      const dy = y + ry * Math.sqrt(Math.max(0, 1 - position * position)) * 0.74;
-      const dripWidth = clamp(rx * 0.07, 13, 22);
-      const dripHeight = clamp(h * dripFactors[index], 16, 48);
-      ctx.beginPath();
-      ctx.roundRect(dx - dripWidth / 2, dy - 5, dripWidth, dripHeight, dripWidth / 2);
-      ctx.fill();
-    });
-
-    const pipingCount = this.candles.length > 65 ? 14 : 20;
-    for (let index = 0; index < pipingCount; index += 1) {
-      const angle = index / pipingCount * Math.PI * 2;
-      const px = x + Math.cos(angle) * rx * 0.89;
-      const py = y - 2 + Math.sin(angle) * ry * 0.78;
-      const puff = clamp(rx * 0.038, 5, 10);
-      ctx.fillStyle = "rgba(183, 126, 123, 0.16)";
-      ctx.beginPath();
-      ctx.ellipse(px + 1, py + 2, puff * 1.18, puff * 0.68, 0, 0, Math.PI * 2);
-      ctx.fill();
-      const piping = ctx.createRadialGradient(px - puff * 0.25, py - puff * 0.32, 0, px, py, puff * 1.15);
-      piping.addColorStop(0, "#ffffff");
-      piping.addColorStop(0.58, "#fff7e9");
-      piping.addColorStop(1, "#e9c8bd");
-      ctx.fillStyle = piping;
-      ctx.beginPath();
-      ctx.ellipse(px, py, puff, puff * 0.7, Math.sin(angle) * 0.18, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
     ctx.beginPath();
     ctx.ellipse(x - rx * 0.53, y + h * 0.28, rx * 0.07, h * 0.26, 0.12, 0, Math.PI * 2);
     ctx.fill();
@@ -916,6 +1022,7 @@ class BlowDetector {
 let appState = "idle";
 let operationId = 0;
 const diagnostics = new MicrophoneDiagnostics();
+const birthdaySong = new BirthdaySong();
 const detector = new BlowDetector(
   (power, elapsed) => scene.applyBlow(power, elapsed),
   (telemetry) => diagnostics.update(telemetry)
@@ -923,6 +1030,7 @@ const detector = new BlowDetector(
 const scene = new BirthdayScene(document.querySelector("#scene"), () => {
   if (appState !== "listening") return;
   appState = "complete";
+  birthdaySong.stop();
   detector.stop();
   diagnostics.setStage("已停止");
   setButton("再点一次", 0);
@@ -945,6 +1053,7 @@ async function lightCandles() {
   const count = readCount();
   const digitMode = modeInput.checked;
 
+  birthdaySong.stop();
   if (scene.litCount) scene.extinguishAll();
   appState = "calibrating";
   setLocked(true);
@@ -966,13 +1075,21 @@ async function lightCandles() {
     if (id !== operationId) return;
 
     scene.createCandles(count, digitMode);
-    appState = "listening";
+    appState = "singing";
     setLocked(false);
     setButton("重新点燃", 0);
-    setStatus("蜡烛点好了，对着屏幕轻轻吹气");
+    setStatus("生日快乐歌播放中，唱完再吹蜡烛");
+    diagnostics.setStage("生日歌播放中");
+    const completed = await birthdaySong.play(detector.context);
+    if (id !== operationId || !completed || !scene.litCount) return;
+
+    appState = "listening";
+    setStatus("唱完啦，现在可以吹蜡烛了");
+    diagnostics.setStage("等待吹气");
     detector.start();
   } catch (error) {
     console.error(error);
+    birthdaySong.stop();
     detector.stop();
     diagnostics.setStage("不可用");
     appState = "idle";
@@ -994,12 +1111,32 @@ modeInput.addEventListener("change", () => {
 lightButton.addEventListener("click", lightCandles);
 
 document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && appState === "singing") {
+    operationId += 1;
+    birthdaySong.stop();
+    appState = "song-paused";
+    diagnostics.setStage("音乐已停止");
+    return;
+  }
+
+  if (document.visibilityState === "visible" && appState === "song-paused" && scene.litCount) {
+    detector.context.resume().then(() => {
+      appState = "listening";
+      setStatus("音乐已停止，现在可以吹蜡烛了");
+      diagnostics.setStage("等待吹气");
+      detector.start();
+    }).catch(() => setStatus("麦克风已暂停，请重新点燃"));
+    return;
+  }
+
   if (document.visibilityState === "visible" && appState === "listening" && detector.context?.state === "suspended") {
     detector.context.resume().catch(() => {
       setStatus("麦克风已暂停，请重新点燃");
     });
   }
 });
+
+window.addEventListener("pagehide", () => birthdaySong.stop());
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

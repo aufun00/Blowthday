@@ -1,11 +1,12 @@
-const CACHE_NAME = "blowthday-v4";
+const CACHE_NAME = "blowthday-v5";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./raying.jpeg"
 ];
 
 self.addEventListener("install", (event) => {
