@@ -545,15 +545,15 @@ class BirthdayScene {
     const { centerX: x, topY: y, radiusX: rx, radiusY: ry, cakeHeight: h } = cake;
     const plateY = y + h + ry * 0.7;
     const shadow = ctx.createRadialGradient(
-      x, plateY + ry * 0.62, 12,
-      x, plateY + ry * 0.62, rx * 1.38
+      x, plateY + ry * 0.82, 12,
+      x, plateY + ry * 0.82, rx * 1.42
     );
     shadow.addColorStop(0, "rgba(105, 67, 62, 0.2)");
     shadow.addColorStop(0.58, "rgba(105, 67, 62, 0.09)");
     shadow.addColorStop(1, "rgba(105, 67, 62, 0)");
     ctx.fillStyle = shadow;
     ctx.beginPath();
-    ctx.ellipse(x, plateY + ry * 0.62, rx * 1.37, ry * 0.72, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, plateY + ry * 0.82, rx * 1.4, ry * 0.9, 0, 0, Math.PI * 2);
     ctx.fill();
 
     const plateEdge = ctx.createLinearGradient(0, plateY - ry * 0.55, 0, plateY + ry * 0.55);
@@ -562,7 +562,7 @@ class BirthdayScene {
     plateEdge.addColorStop(1, "#cdbb9b");
     ctx.fillStyle = plateEdge;
     ctx.beginPath();
-    ctx.ellipse(x, plateY, rx * 1.19, ry * 0.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, plateY, rx * 1.19, ry * 1.08, 0, 0, Math.PI * 2);
     ctx.fill();
 
     const plateFace = ctx.createRadialGradient(x - rx * 0.25, plateY - ry * 0.25, 0, x, plateY, rx * 1.12);
@@ -571,13 +571,13 @@ class BirthdayScene {
     plateFace.addColorStop(1, "#e3d5bd");
     ctx.fillStyle = plateFace;
     ctx.beginPath();
-    ctx.ellipse(x, plateY - 4, rx * 1.1, ry * 0.43, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, plateY - 5, rx * 1.12, ry * 0.98, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = "rgba(156, 130, 91, 0.24)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(x, plateY - 4, rx * 1.03, ry * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, plateY - 5, rx * 1.04, ry * 0.86, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
 

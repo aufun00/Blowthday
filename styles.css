@@ -275,7 +275,8 @@ body.has-candles .intro {
 .status {
   position: absolute;
   z-index: 3;
-  bottom: max(24px, calc(env(safe-area-inset-bottom) + 14px));
+  top: max(80px, calc(env(safe-area-inset-top) + 70px));
+  bottom: auto;
   left: 50%;
   max-width: calc(100vw - 32px);
   padding: 10px 16px;
@@ -483,7 +484,7 @@ body.has-candles .intro {
   }
 
   .intro {
-    top: 20%;
+    top: 24%;
   }
 
   .diagnostics {
