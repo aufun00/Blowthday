@@ -543,7 +543,7 @@ class BirthdayScene {
 
   drawTable(ctx, cake) {
     const { centerX: x, topY: y, radiusX: rx, radiusY: ry, cakeHeight: h } = cake;
-    const plateY = y + h + ry * 0.7;
+    const plateY = y + h + ry * 0.02;
     const shadow = ctx.createRadialGradient(
       x, plateY + ry * 0.82, 12,
       x, plateY + ry * 0.82, rx * 1.42
@@ -579,6 +579,15 @@ class BirthdayScene {
     ctx.beginPath();
     ctx.ellipse(x, plateY - 5, rx * 1.04, ry * 0.86, 0, 0, Math.PI * 2);
     ctx.stroke();
+
+    const contactShadow = ctx.createRadialGradient(x, plateY + ry * 0.18, rx * 0.46, x, plateY + ry * 0.18, rx * 1.05);
+    contactShadow.addColorStop(0, "rgba(92, 63, 29, 0.17)");
+    contactShadow.addColorStop(0.72, "rgba(92, 63, 29, 0.1)");
+    contactShadow.addColorStop(1, "rgba(92, 63, 29, 0)");
+    ctx.fillStyle = contactShadow;
+    ctx.beginPath();
+    ctx.ellipse(x, plateY + ry * 0.18, rx * 1.04, ry * 0.84, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   drawCake(ctx, cake, time) {
