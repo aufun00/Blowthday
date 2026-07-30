@@ -1,4 +1,4 @@
-const CACHE_NAME = "blowthday-v2";
+const CACHE_NAME = "blowthday-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",

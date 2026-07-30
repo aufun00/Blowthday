@@ -49,6 +49,7 @@
   <aside class="diagnostics" aria-label="麦克风实时诊断">
     <div class="diagnostics-head">
       <span>MIC SPECTRUM</span>
+      <span id="audio-processing" class="audio-processing">NS -- · EC -- · AGC --</span>
       <strong id="diagnostic-state" data-state="idle">等待麦克风</strong>
     </div>
     <canvas id="spectrum" aria-label="实时麦克风频谱"></canvas>
@@ -58,9 +59,9 @@
     </div>
     <dl class="diagnostic-values">
       <div><dt>RMS / 阈值</dt><dd id="metric-rms">-- / --</dd></div>
-      <div><dt>高频 / 基线</dt><dd id="metric-high">-- / --</dd></div>
-      <div><dt>ZCR / 基线</dt><dd id="metric-zcr">-- / --</dd></div>
-      <div><dt>候选持续</dt><dd id="metric-hold">0 / 150 ms</dd></div>
+      <div><dt>音量提升</dt><dd id="metric-lift">-- dB</dd></div>
+      <div><dt>低频 / 高频提升</dt><dd id="metric-bands">-- / -- dB</dd></div>
+      <div><dt>候选持续</dt><dd id="metric-hold">0 / 180 ms</dd></div>
     </dl>
   </aside>
 

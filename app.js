@@ -3,6 +3,7 @@
 const COUNT_MIN = 1;
 const COUNT_MAX = 120;
 const CALIBRATION_MS = 1600;
+const BLOW_HOLD_MS = 180;
 
 const countInput = document.querySelector("#candle-count");
 const modeInput = document.querySelector("#candle-mode");
@@ -56,9 +57,10 @@ class MicrophoneDiagnostics {
     this.canvas = document.querySelector("#spectrum");
     this.ctx = this.canvas.getContext("2d");
     this.stateElement = document.querySelector("#diagnostic-state");
+    this.processingElement = document.querySelector("#audio-processing");
     this.rmsElement = document.querySelector("#metric-rms");
-    this.highElement = document.querySelector("#metric-high");
-    this.zcrElement = document.querySelector("#metric-zcr");
+    this.liftElement = document.querySelector("#metric-lift");
+    this.bandsElement = document.querySelector("#metric-bands");
     this.holdElement = document.querySelector("#metric-hold");
     this.rmsFill = document.querySelector("#rms-fill");
     this.rmsThreshold = document.querySelector("#rms-threshold");
@@ -87,9 +89,37 @@ class MicrophoneDiagnostics {
     this.stateElement.dataset.state = state;
   }
 
+  setProcessing(settings, captureMode) {
+    const setting = (name) => {
+      if (settings?.[name] === true) return "ON";
+      if (settings?.[name] === false) return "OFF";
+      return "?";
+    };
+    const ns = setting("noiseSuppression");
+    const ec = setting("echoCancellation");
+    const agc = setting("autoGainControl");
+    this.processingElement.textContent = `NS ${ns} · EC ${ec} · AGC ${agc}`;
+    const processed = ns === "ON" || ec === "ON" || agc === "ON";
+    this.processingElement.classList.toggle("is-raw", captureMode === "raw" && !processed);
+    this.processingElement.classList.toggle("is-processed", processed);
+    this.processingElement.title = captureMode === "raw"
+      ? "浏览器接受了关闭音频处理的严格请求"
+      : "浏览器未接受严格请求，已回退到兼容模式";
+  }
+
   update(telemetry) {
     this.lastTelemetry = telemetry;
-    const { features, baseline, candidateMs, candidate, active, stage } = telemetry;
+    const {
+      features,
+      baseline,
+      candidateMs,
+      candidate,
+      active,
+      stage,
+      rmsLiftDb,
+      lowLiftDb,
+      highLiftDb
+    } = telemetry;
     let label = "环境音";
     let state = "idle";
 
@@ -107,10 +137,11 @@ class MicrophoneDiagnostics {
     this.setStage(label, state);
 
     const format = (value, digits = 3) => Number.isFinite(value) ? value.toFixed(digits) : "--";
+    const signed = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}` : "--";
     this.rmsElement.textContent = `${format(features.rms)} / ${format(baseline?.threshold)}`;
-    this.highElement.textContent = `${format(features.highRatio * 100, 1)}% / ${baseline ? `${format(baseline.highRatio * 100, 1)}%` : "--"}`;
-    this.zcrElement.textContent = `${format(features.zcr)} / ${format(baseline?.zcr)}`;
-    this.holdElement.textContent = `${Math.round(candidateMs)} / 150 ms`;
+    this.liftElement.textContent = `${signed(rmsLiftDb)} dB`;
+    this.bandsElement.textContent = `${signed(lowLiftDb)} / ${signed(highLiftDb)} dB`;
+    this.holdElement.textContent = `${Math.round(candidateMs)} / ${BLOW_HOLD_MS} ms`;
 
     const meterMax = Math.max(0.08, (baseline?.threshold || 0.03) * 2.6);
     this.rmsFill.style.width = `${clamp(features.rms / meterMax, 0, 1) * 100}%`;
@@ -573,6 +604,8 @@ class BlowDetector {
     this.raf = 0;
     this.lastSampleAt = 0;
     this.candidateMs = 0;
+    this.trackSettings = {};
+    this.captureMode = "compatible";
   }
 
   async open() {
@@ -586,57 +619,70 @@ class BlowDetector {
     if (!this.context || this.context.state === "closed") this.context = new AudioContextClass();
     await this.context.resume();
 
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: { ideal: false },
-        noiseSuppression: { ideal: false },
-        autoGainControl: { ideal: false },
-        channelCount: { ideal: 1 }
-      },
-      video: false
-    });
+    const rawAudio = {
+      echoCancellation: { exact: false },
+      noiseSuppression: { exact: false },
+      autoGainControl: { exact: false },
+      channelCount: { ideal: 1 }
+    };
+    const compatibleAudio = {
+      echoCancellation: { ideal: false },
+      noiseSuppression: { ideal: false },
+      autoGainControl: { ideal: false },
+      channelCount: { ideal: 1 }
+    };
+
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: rawAudio, video: false });
+      this.captureMode = "raw";
+    } catch (error) {
+      if (error?.name !== "OverconstrainedError" && error?.name !== "TypeError") throw error;
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: compatibleAudio, video: false });
+      this.captureMode = "compatible";
+    }
+
+    const track = this.stream.getAudioTracks()[0];
+    this.trackSettings = track?.getSettings?.() || {};
 
     this.source = this.context.createMediaStreamSource(this.stream);
     this.analyser = this.context.createAnalyser();
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0.16;
     this.source.connect(this.analyser);
-    this.timeData = new Uint8Array(this.analyser.fftSize);
+    this.timeData = new Float32Array(this.analyser.fftSize);
     this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
   }
 
   readFeatures() {
-    this.analyser.getByteTimeDomainData(this.timeData);
+    this.analyser.getFloatTimeDomainData(this.timeData);
     this.analyser.getByteFrequencyData(this.frequencyData);
 
     let squareSum = 0;
     let crossings = 0;
-    let previous = this.timeData[0] - 128;
+    let previous = this.timeData[0];
     for (let index = 0; index < this.timeData.length; index += 1) {
-      const sample = (this.timeData[index] - 128) / 128;
+      const sample = this.timeData[index];
       squareSum += sample * sample;
-      const current = this.timeData[index] - 128;
+      const current = sample;
       if ((previous < 0 && current >= 0) || (previous >= 0 && current < 0)) crossings += 1;
       previous = current;
     }
 
     const sampleRate = this.context.sampleRate;
     const binHz = sampleRate / this.analyser.fftSize;
-    const startBin = Math.max(1, Math.floor(180 / binHz));
-    const splitBin = Math.min(this.frequencyData.length - 1, Math.ceil(1800 / binHz));
-    const endBin = Math.min(this.frequencyData.length, Math.ceil(8000 / binHz));
-    let lowEnergy = 0;
-    let highEnergy = 0;
-    for (let index = startBin; index < endBin; index += 1) {
-      const magnitude = this.frequencyData[index] / 255;
-      if (index < splitBin) lowEnergy += magnitude;
-      else highEnergy += magnitude;
-    }
+    const averageBand = (fromHz, toHz) => {
+      const fromBin = clamp(Math.floor(fromHz / binHz), 1, this.frequencyData.length - 1);
+      const toBin = clamp(Math.ceil(toHz / binHz), fromBin + 1, this.frequencyData.length);
+      let total = 0;
+      for (let index = fromBin; index < toBin; index += 1) total += this.frequencyData[index] / 255;
+      return total / (toBin - fromBin);
+    };
 
     return {
       rms: Math.sqrt(squareSum / this.timeData.length),
       zcr: crossings / this.timeData.length,
-      highRatio: highEnergy / Math.max(0.001, lowEnergy + highEnergy)
+      lowLevel: averageBand(60, 900),
+      highLevel: averageBand(1800, 8000)
     };
   }
 
@@ -675,8 +721,9 @@ class BlowDetector {
     this.baseline = {
       rms,
       zcr: percentile("zcr", 0.75),
-      highRatio: percentile("highRatio", 0.75),
-      threshold: clamp(rms * 1.65 + 0.004, 0.008, 0.18)
+      lowLevel: percentile("lowLevel", 0.82),
+      highLevel: percentile("highLevel", 0.82),
+      threshold: clamp(rms * 1.35 + 0.00035, 0.0015, 0.12)
     };
   }
 
@@ -691,17 +738,25 @@ class BlowDetector {
       this.lastSampleAt = now;
       const features = this.readFeatures();
       const threshold = this.baseline.threshold;
-      const loudness = features.rms / threshold;
-      const hissLike = features.zcr > Math.max(0.075, this.baseline.zcr * 1.18)
-        || features.highRatio > this.baseline.highRatio + 0.045;
-      const veryStrongBroadband = features.rms > threshold * 2.5
-        && features.highRatio > this.baseline.highRatio + 0.015;
-      const candidate = features.rms > threshold && (hissLike || veryStrongBroadband);
+      const liftDb = (value, reference, floor) => 20 * Math.log10(
+        Math.max(value + floor, 0.000001) / Math.max(reference + floor, 0.000001)
+      );
+      const rmsLiftDb = liftDb(features.rms, this.baseline.rms, 0.00005);
+      const lowLiftDb = liftDb(features.lowLevel, this.baseline.lowLevel, 0.003);
+      const highLiftDb = liftDb(features.highLevel, this.baseline.highLevel, 0.003);
+      const enoughSignal = features.rms >= Math.max(0.0007, this.baseline.rms * 1.08);
+      const relativeRise = rmsLiftDb >= 2.2 || features.rms >= threshold;
+      const lowWindLike = lowLiftDb >= 1.8;
+      const hissLike = highLiftDb >= 1.8
+        || features.zcr > Math.max(0.055, this.baseline.zcr * 1.12);
+      const candidate = enoughSignal
+        && relativeRise
+        && (lowWindLike || hissLike || rmsLiftDb >= 4.5);
 
       if (candidate) this.candidateMs = Math.min(550, this.candidateMs + elapsed);
       else this.candidateMs = Math.max(0, this.candidateMs - elapsed * 1.8);
 
-      const active = this.candidateMs >= 150;
+      const active = this.candidateMs >= BLOW_HOLD_MS;
       this.onTelemetry({
         features,
         frequencyData: this.frequencyData,
@@ -710,12 +765,15 @@ class BlowDetector {
         candidateMs: this.candidateMs,
         candidate,
         active,
+        rmsLiftDb,
+        lowLiftDb,
+        highLiftDb,
         stage: "listening"
       });
 
       if (active) {
-        const spectralLift = Math.max(0, features.highRatio - this.baseline.highRatio);
-        const power = clamp(0.35 + (loudness - 1) * 0.72 + spectralLift * 1.6, 0.35, 1.8);
+        const bandLift = Math.max(0, lowLiftDb, highLiftDb);
+        const power = clamp(0.35 + Math.max(0, rmsLiftDb - 2) * 0.16 + bandLift * 0.05, 0.35, 1.8);
         this.onBlow(power, elapsed);
       }
       this.raf = requestAnimationFrame(detect);
@@ -778,6 +836,7 @@ async function lightCandles() {
   try {
     await detector.open();
     if (id !== operationId) return;
+    diagnostics.setProcessing(detector.trackSettings, detector.captureMode);
     setButton("采样 0%", 0);
     setStatus("请保持自然环境音");
     await detector.calibrate((progress) => {

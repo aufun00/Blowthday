@@ -28,7 +28,7 @@ body {
 
 body {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) calc(112px + env(safe-area-inset-bottom));
   background:
     radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.96) 0 6%, transparent 27%),
     radial-gradient(circle at 85% 8%, rgba(255, 205, 176, 0.52), transparent 29%),
@@ -297,13 +297,17 @@ body.has-candles .intro {
   position: relative;
   z-index: 4;
   align-self: end;
-  justify-self: center;
-  width: calc(100% - 32px);
-  max-width: 680px;
-  margin: 0 auto max(12px, env(safe-area-inset-bottom));
-  padding: 10px 12px 9px;
+  justify-self: stretch;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 8px max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 17px;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 17px 17px 0 0;
   color: var(--muted);
   background: rgba(255, 250, 239, 0.76);
   box-shadow: 0 12px 34px rgba(100, 60, 58, 0.12);
@@ -320,6 +324,22 @@ body.has-candles .intro {
   font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.16em;
+}
+
+.audio-processing {
+  margin-left: auto;
+  margin-right: 12px;
+  color: #9a8585;
+  font-size: 8px;
+  letter-spacing: 0.02em;
+}
+
+.audio-processing.is-raw {
+  color: #4f9687;
+}
+
+.audio-processing.is-processed {
+  color: #c4704d;
 }
 
 .diagnostics-head strong {
@@ -343,7 +363,7 @@ body.has-candles .intro {
 #spectrum {
   display: block;
   width: 100%;
-  height: 46px;
+  height: 38px;
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(117, 87, 86, 0.04), rgba(117, 87, 86, 0.09));
 }
@@ -467,9 +487,9 @@ body.has-candles .intro {
   }
 
   .diagnostics {
-    width: calc(100% - 20px);
-    margin-bottom: max(8px, env(safe-area-inset-bottom));
-    padding: 8px 9px;
+    width: 100%;
+    margin: 0;
+    padding: 8px max(9px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left));
   }
 
   #spectrum {
@@ -486,6 +506,11 @@ body.has-candles .intro {
 
   .diagnostic-values dd {
     font-size: 9px;
+  }
+
+  .audio-processing {
+    margin-right: 7px;
+    font-size: 7px;
   }
 }
 
