@@ -385,67 +385,187 @@ class BirthdayScene {
     ctx.clearRect(0, 0, this.width, this.height);
     const cake = this.cakeGeometry();
     this.drawTable(ctx, cake);
-    this.drawCake(ctx, cake);
+    this.drawCake(ctx, cake, time);
     this.drawCandles(ctx, cake, time);
     this.drawSmoke(ctx);
     this.drawConfetti(ctx);
   }
 
   drawTable(ctx, cake) {
-    const gradient = ctx.createRadialGradient(
-      cake.centerX, cake.topY + cake.cakeHeight + 35, 12,
-      cake.centerX, cake.topY + cake.cakeHeight + 35, cake.radiusX * 1.28
+    const { centerX: x, topY: y, radiusX: rx, radiusY: ry, cakeHeight: h } = cake;
+    const plateY = y + h + ry * 0.7;
+    const shadow = ctx.createRadialGradient(
+      x, plateY + ry * 0.62, 12,
+      x, plateY + ry * 0.62, rx * 1.38
     );
-    gradient.addColorStop(0, "rgba(119, 70, 63, 0.22)");
-    gradient.addColorStop(1, "rgba(119, 70, 63, 0)");
-    ctx.fillStyle = gradient;
+    shadow.addColorStop(0, "rgba(105, 67, 62, 0.2)");
+    shadow.addColorStop(0.58, "rgba(105, 67, 62, 0.09)");
+    shadow.addColorStop(1, "rgba(105, 67, 62, 0)");
+    ctx.fillStyle = shadow;
     ctx.beginPath();
-    ctx.ellipse(cake.centerX, cake.topY + cake.cakeHeight + 36, cake.radiusX * 1.25, cake.radiusY * 0.78, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, plateY + ry * 0.62, rx * 1.37, ry * 0.72, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    const plateEdge = ctx.createLinearGradient(0, plateY - ry * 0.55, 0, plateY + ry * 0.55);
+    plateEdge.addColorStop(0, "#fffdf8");
+    plateEdge.addColorStop(0.52, "#f8e8df");
+    plateEdge.addColorStop(1, "#dcbeb8");
+    ctx.fillStyle = plateEdge;
+    ctx.beginPath();
+    ctx.ellipse(x, plateY, rx * 1.19, ry * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const plateFace = ctx.createRadialGradient(x - rx * 0.25, plateY - ry * 0.25, 0, x, plateY, rx * 1.12);
+    plateFace.addColorStop(0, "#ffffff");
+    plateFace.addColorStop(0.72, "#fff9f1");
+    plateFace.addColorStop(1, "#ead5cf");
+    ctx.fillStyle = plateFace;
+    ctx.beginPath();
+    ctx.ellipse(x, plateY - 4, rx * 1.1, ry * 0.43, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(178, 137, 132, 0.24)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(x, plateY - 4, rx * 1.03, ry * 0.34, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
-  drawCake(ctx, cake) {
+  drawCake(ctx, cake, time) {
     const { centerX: x, topY: y, radiusX: rx, radiusY: ry, cakeHeight: h } = cake;
+    const side = new Path2D();
+    side.moveTo(x - rx, y);
+    side.lineTo(x - rx, y + h);
+    side.bezierCurveTo(x - rx, y + h + ry, x + rx, y + h + ry, x + rx, y + h);
+    side.lineTo(x + rx, y);
+    side.closePath();
 
     const body = ctx.createLinearGradient(0, y, 0, y + h);
-    body.addColorStop(0, "#f28a7e");
-    body.addColorStop(1, "#ce5158");
+    body.addColorStop(0, "#f5aaa0");
+    body.addColorStop(0.5, "#ec7d78");
+    body.addColorStop(1, "#c94c58");
     ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.moveTo(x - rx, y);
-    ctx.lineTo(x - rx, y + h);
-    ctx.bezierCurveTo(x - rx, y + h + ry, x + rx, y + h + ry, x + rx, y + h);
-    ctx.lineTo(x + rx, y);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fill(side);
 
-    ctx.fillStyle = "#fff8ea";
+    ctx.save();
+    ctx.clip(side);
+
+    const creamBand = ctx.createLinearGradient(0, y + h * 0.43, 0, y + h * 0.68);
+    creamBand.addColorStop(0, "#f4c0ae");
+    creamBand.addColorStop(0.18, "#ffe9d7");
+    creamBand.addColorStop(0.72, "#fbd9c3");
+    creamBand.addColorStop(1, "#dc776f");
+    ctx.fillStyle = creamBand;
+    ctx.fillRect(x - rx, y + h * 0.45, rx * 2, h * 0.2);
+
+    ctx.fillStyle = "rgba(173, 49, 64, 0.48)";
+    ctx.fillRect(x - rx, y + h * 0.61, rx * 2, Math.max(2, h * 0.035));
+
+    const sideShade = ctx.createLinearGradient(x - rx, 0, x + rx, 0);
+    sideShade.addColorStop(0, "rgba(96, 39, 50, 0.22)");
+    sideShade.addColorStop(0.18, "rgba(255, 255, 255, 0.08)");
+    sideShade.addColorStop(0.5, "rgba(255, 255, 255, 0.18)");
+    sideShade.addColorStop(0.84, "rgba(255, 255, 255, 0.02)");
+    sideShade.addColorStop(1, "rgba(91, 34, 45, 0.25)");
+    ctx.fillStyle = sideShade;
+    ctx.fillRect(x - rx, y, rx * 2, h + ry);
+
+    if (this.litCount) {
+      const glowStrength = 0.035 + Math.min(1, this.litCount / 14) * 0.08;
+      const sideGlow = ctx.createRadialGradient(x, y + h * 0.18, 0, x, y + h * 0.2, rx * 0.92);
+      sideGlow.addColorStop(0, `rgba(255, 190, 74, ${glowStrength})`);
+      sideGlow.addColorStop(1, "rgba(255, 190, 74, 0)");
+      ctx.fillStyle = sideGlow;
+      ctx.fillRect(x - rx, y, rx * 2, h + ry);
+    }
+    ctx.restore();
+
+    const topEdge = ctx.createLinearGradient(0, y - ry, 0, y + ry);
+    topEdge.addColorStop(0, "#fffdf6");
+    topEdge.addColorStop(0.64, "#f9e4d8");
+    topEdge.addColorStop(1, "#dca49f");
+    ctx.fillStyle = topEdge;
     ctx.beginPath();
     ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const glaze = ctx.createLinearGradient(0, y - ry, 0, y + ry * 1.45);
-    glaze.addColorStop(0, "#fffdf5");
-    glaze.addColorStop(1, "#f6dfcf");
+    const glaze = ctx.createRadialGradient(x - rx * 0.28, y - ry * 0.46, 5, x, y, rx);
+    glaze.addColorStop(0, "#ffffff");
+    glaze.addColorStop(0.56, "#fffaf1");
+    glaze.addColorStop(1, "#f3d7cf");
     ctx.fillStyle = glaze;
     ctx.beginPath();
-    ctx.ellipse(x, y - 2, rx * 0.94, ry * 0.86, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y - 3, rx * 0.94, ry * 0.84, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    if (this.litCount) {
+      const pulse = 0.8 + Math.sin(time * 3.4) * 0.08;
+      const topGlow = ctx.createRadialGradient(x, y - 8, 0, x, y - 4, rx * 0.78);
+      topGlow.addColorStop(0, `rgba(255, 196, 82, ${0.15 * pulse})`);
+      topGlow.addColorStop(0.7, `rgba(255, 196, 82, ${0.045 * pulse})`);
+      topGlow.addColorStop(1, "rgba(255, 196, 82, 0)");
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(x, y - 3, rx * 0.94, ry * 0.84, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = topGlow;
+      ctx.fillRect(x - rx, y - ry, rx * 2, ry * 2);
+      ctx.restore();
+    }
+
+    const decorationCount = this.candles.length > 50 ? 12 : 24;
+    const sprinkleColors = ["#db5b62", "#e9a542", "#67aaa3", "#9478bd"];
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    ctx.lineCap = "round";
+    ctx.lineWidth = 2.2;
+    for (let index = 0; index < decorationCount; index += 1) {
+      const radius = Math.sqrt((index + 0.7) / decorationCount) * 0.74;
+      const angle = index * goldenAngle + 0.4;
+      const sx = x + Math.cos(angle) * radius * rx;
+      const sy = y - 3 + Math.sin(angle) * radius * ry * 0.72;
+      ctx.strokeStyle = sprinkleColors[index % sprinkleColors.length];
+      ctx.beginPath();
+      ctx.moveTo(sx - Math.cos(angle * 1.7) * 2.3, sy - Math.sin(angle * 1.7) * 1.4);
+      ctx.lineTo(sx + Math.cos(angle * 1.7) * 2.3, sy + Math.sin(angle * 1.7) * 1.4);
+      ctx.stroke();
+    }
+
     ctx.fillStyle = "#fff8ea";
-    const dripXs = [-0.76, -0.39, 0.02, 0.46, 0.78];
-    const dripHeights = [25, 43, 31, 47, 27];
+    const dripXs = [-0.78, -0.51, -0.2, 0.15, 0.49, 0.78];
+    const dripFactors = [0.2, 0.38, 0.25, 0.42, 0.3, 0.18];
     dripXs.forEach((position, index) => {
       const dx = x + rx * position;
-      const dy = y + ry * Math.sqrt(Math.max(0, 1 - position * position)) * 0.72;
+      const dy = y + ry * Math.sqrt(Math.max(0, 1 - position * position)) * 0.74;
+      const dripWidth = clamp(rx * 0.07, 13, 22);
+      const dripHeight = clamp(h * dripFactors[index], 16, 48);
       ctx.beginPath();
-      ctx.roundRect(dx - 11, dy - 5, 22, dripHeights[index], 11);
+      ctx.roundRect(dx - dripWidth / 2, dy - 5, dripWidth, dripHeight, dripWidth / 2);
       ctx.fill();
     });
 
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
+    const pipingCount = this.candles.length > 65 ? 14 : 20;
+    for (let index = 0; index < pipingCount; index += 1) {
+      const angle = index / pipingCount * Math.PI * 2;
+      const px = x + Math.cos(angle) * rx * 0.89;
+      const py = y - 2 + Math.sin(angle) * ry * 0.78;
+      const puff = clamp(rx * 0.038, 5, 10);
+      ctx.fillStyle = "rgba(183, 126, 123, 0.16)";
+      ctx.beginPath();
+      ctx.ellipse(px + 1, py + 2, puff * 1.18, puff * 0.68, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const piping = ctx.createRadialGradient(px - puff * 0.25, py - puff * 0.32, 0, px, py, puff * 1.15);
+      piping.addColorStop(0, "#ffffff");
+      piping.addColorStop(0.58, "#fff7e9");
+      piping.addColorStop(1, "#e9c8bd");
+      ctx.fillStyle = piping;
+      ctx.beginPath();
+      ctx.ellipse(px, py, puff, puff * 0.7, Math.sin(angle) * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
     ctx.beginPath();
-    ctx.ellipse(x - rx * 0.36, y + h * 0.34, rx * 0.15, h * 0.38, 0.18, 0, Math.PI * 2);
+    ctx.ellipse(x - rx * 0.53, y + h * 0.28, rx * 0.07, h * 0.26, 0.12, 0, Math.PI * 2);
     ctx.fill();
   }
 
