@@ -51,6 +51,116 @@ function setButton(label, progress = 0) {
   buttonProgress.style.width = `${clamp(progress, 0, 1) * 100}%`;
 }
 
+class MicrophoneDiagnostics {
+  constructor() {
+    this.canvas = document.querySelector("#spectrum");
+    this.ctx = this.canvas.getContext("2d");
+    this.stateElement = document.querySelector("#diagnostic-state");
+    this.rmsElement = document.querySelector("#metric-rms");
+    this.highElement = document.querySelector("#metric-high");
+    this.zcrElement = document.querySelector("#metric-zcr");
+    this.holdElement = document.querySelector("#metric-hold");
+    this.rmsFill = document.querySelector("#rms-fill");
+    this.rmsThreshold = document.querySelector("#rms-threshold");
+    this.width = 0;
+    this.height = 0;
+    this.dpr = 1;
+    this.lastTelemetry = null;
+    this.resize = this.resize.bind(this);
+    window.addEventListener("resize", this.resize);
+    this.resize();
+  }
+
+  resize() {
+    const bounds = this.canvas.getBoundingClientRect();
+    this.width = Math.max(1, bounds.width);
+    this.height = Math.max(1, bounds.height);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.canvas.width = Math.round(this.width * this.dpr);
+    this.canvas.height = Math.round(this.height * this.dpr);
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (this.lastTelemetry) this.draw(this.lastTelemetry);
+  }
+
+  setStage(label, state = "idle") {
+    this.stateElement.textContent = label;
+    this.stateElement.dataset.state = state;
+  }
+
+  update(telemetry) {
+    this.lastTelemetry = telemetry;
+    const { features, baseline, candidateMs, candidate, active, stage } = telemetry;
+    let label = "环境音";
+    let state = "idle";
+
+    if (stage === "calibrating") label = "采样中";
+    else if (active) {
+      label = "吹气成立";
+      state = "blow";
+    } else if (candidate) {
+      label = "候选吹气";
+      state = "candidate";
+    } else if (baseline && features.rms > baseline.threshold) {
+      label = "有声 · 频谱未通过";
+      state = "sound";
+    }
+    this.setStage(label, state);
+
+    const format = (value, digits = 3) => Number.isFinite(value) ? value.toFixed(digits) : "--";
+    this.rmsElement.textContent = `${format(features.rms)} / ${format(baseline?.threshold)}`;
+    this.highElement.textContent = `${format(features.highRatio * 100, 1)}% / ${baseline ? `${format(baseline.highRatio * 100, 1)}%` : "--"}`;
+    this.zcrElement.textContent = `${format(features.zcr)} / ${format(baseline?.zcr)}`;
+    this.holdElement.textContent = `${Math.round(candidateMs)} / 150 ms`;
+
+    const meterMax = Math.max(0.08, (baseline?.threshold || 0.03) * 2.6);
+    this.rmsFill.style.width = `${clamp(features.rms / meterMax, 0, 1) * 100}%`;
+    this.rmsThreshold.style.left = `${clamp((baseline?.threshold || 0) / meterMax, 0, 1) * 100}%`;
+    this.draw(telemetry);
+  }
+
+  draw({ frequencyData, sampleRate, active, candidate }) {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.width, this.height);
+    if (!frequencyData?.length || !sampleRate) return;
+
+    ctx.strokeStyle = "rgba(101, 72, 74, 0.1)";
+    ctx.lineWidth = 1;
+    for (let line = 1; line < 4; line += 1) {
+      const y = this.height * line / 4;
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(this.width, y + 0.5);
+      ctx.stroke();
+    }
+
+    const barCount = clamp(Math.floor(this.width / 7), 32, 72);
+    const gap = 2;
+    const barWidth = Math.max(2, (this.width - gap * (barCount - 1)) / barCount);
+    const fftSize = frequencyData.length * 2;
+    const binHz = sampleRate / fftSize;
+    const minFrequency = 80;
+    const maxFrequency = Math.min(8000, sampleRate / 2);
+    const color = active ? "#d94d50" : candidate ? "#e8794f" : "#dba45e";
+
+    ctx.fillStyle = color;
+    for (let bar = 0; bar < barCount; bar += 1) {
+      const fromFrequency = minFrequency * Math.pow(maxFrequency / minFrequency, bar / barCount);
+      const toFrequency = minFrequency * Math.pow(maxFrequency / minFrequency, (bar + 1) / barCount);
+      const fromBin = clamp(Math.floor(fromFrequency / binHz), 1, frequencyData.length - 1);
+      const toBin = clamp(Math.ceil(toFrequency / binHz), fromBin + 1, frequencyData.length);
+      let magnitude = 0;
+      for (let bin = fromBin; bin < toBin; bin += 1) magnitude = Math.max(magnitude, frequencyData[bin] / 255);
+      const height = Math.max(1.5, Math.pow(magnitude, 0.72) * (this.height - 3));
+      const x = bar * (barWidth + gap);
+      ctx.globalAlpha = 0.42 + bar / barCount * 0.5;
+      ctx.beginPath();
+      ctx.roundRect(x, this.height - height, barWidth, height, Math.min(2, barWidth / 2));
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
 class BirthdayScene {
   constructor(canvas, onAllExtinguished) {
     this.canvas = canvas;
@@ -447,8 +557,9 @@ class BirthdayScene {
 }
 
 class BlowDetector {
-  constructor(onBlow) {
+  constructor(onBlow, onTelemetry) {
     this.onBlow = onBlow;
+    this.onTelemetry = onTelemetry;
     this.context = null;
     this.stream = null;
     this.source = null;
@@ -530,12 +641,24 @@ class BlowDetector {
   async calibrate(onProgress) {
     const samples = [];
     const startedAt = performance.now();
+    let latestFeatures = null;
 
     await new Promise((resolve) => {
       const sample = (now) => {
         const elapsed = now - startedAt;
         onProgress(clamp(elapsed / CALIBRATION_MS, 0, 1));
-        if (elapsed > 220) samples.push(this.readFeatures());
+        latestFeatures = this.readFeatures();
+        this.onTelemetry({
+          features: latestFeatures,
+          frequencyData: this.frequencyData,
+          sampleRate: this.context.sampleRate,
+          baseline: null,
+          candidateMs: 0,
+          candidate: false,
+          active: false,
+          stage: "calibrating"
+        });
+        if (elapsed > 220) samples.push(latestFeatures);
         if (elapsed < CALIBRATION_MS) requestAnimationFrame(sample);
         else resolve();
       };
@@ -576,7 +699,19 @@ class BlowDetector {
       if (candidate) this.candidateMs = Math.min(550, this.candidateMs + elapsed);
       else this.candidateMs = Math.max(0, this.candidateMs - elapsed * 1.8);
 
-      if (this.candidateMs >= 150) {
+      const active = this.candidateMs >= 150;
+      this.onTelemetry({
+        features,
+        frequencyData: this.frequencyData,
+        sampleRate: this.context.sampleRate,
+        baseline: this.baseline,
+        candidateMs: this.candidateMs,
+        candidate,
+        active,
+        stage: "listening"
+      });
+
+      if (active) {
         const spectralLift = Math.max(0, features.highRatio - this.baseline.highRatio);
         const power = clamp(0.35 + (loudness - 1) * 0.72 + spectralLift * 1.6, 0.35, 1.8);
         this.onBlow(power, elapsed);
@@ -600,11 +735,16 @@ class BlowDetector {
 
 let appState = "idle";
 let operationId = 0;
-const detector = new BlowDetector((power, elapsed) => scene.applyBlow(power, elapsed));
+const diagnostics = new MicrophoneDiagnostics();
+const detector = new BlowDetector(
+  (power, elapsed) => scene.applyBlow(power, elapsed),
+  (telemetry) => diagnostics.update(telemetry)
+);
 const scene = new BirthdayScene(document.querySelector("#scene"), () => {
   if (appState !== "listening") return;
   appState = "complete";
   detector.stop();
+  diagnostics.setStage("已停止");
   setButton("再点一次", 0);
   setStatus("生日快乐！愿望会实现的");
 });
@@ -630,6 +770,7 @@ async function lightCandles() {
   setLocked(true);
   setButton("等待麦克风…", 0);
   setStatus("正在准备麦克风");
+  diagnostics.setStage("等待授权");
   noticeElement.hidden = true;
 
   try {
@@ -652,6 +793,7 @@ async function lightCandles() {
   } catch (error) {
     console.error(error);
     detector.stop();
+    diagnostics.setStage("不可用");
     appState = "idle";
     setLocked(false);
     setButton("重试", 0);

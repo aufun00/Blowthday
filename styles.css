@@ -285,6 +285,121 @@ body.has-candles .intro {
   pointer-events: none;
 }
 
+.diagnostics {
+  position: fixed;
+  z-index: 4;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(78px, calc(env(safe-area-inset-bottom) + 68px));
+  left: max(16px, env(safe-area-inset-left));
+  max-width: 680px;
+  margin: auto;
+  padding: 10px 12px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 17px;
+  color: var(--muted);
+  background: rgba(255, 250, 239, 0.76);
+  box-shadow: 0 12px 34px rgba(100, 60, 58, 0.12);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  pointer-events: none;
+}
+
+.diagnostics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.diagnostics-head strong {
+  color: #8d7778;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.diagnostics-head strong[data-state="sound"] {
+  color: #b47835;
+}
+
+.diagnostics-head strong[data-state="candidate"] {
+  color: #df704e;
+}
+
+.diagnostics-head strong[data-state="blow"] {
+  color: #d2444d;
+}
+
+#spectrum {
+  display: block;
+  width: 100%;
+  height: 46px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(117, 87, 86, 0.04), rgba(117, 87, 86, 0.09));
+}
+
+.rms-meter {
+  position: relative;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(104, 75, 76, 0.12);
+}
+
+.rms-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #efb354 0 58%, #e75d56 100%);
+  transition: width 50ms linear;
+}
+
+.rms-threshold {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 0;
+  width: 2px;
+  background: #8f5556;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.diagnostic-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin: 7px 0 0;
+}
+
+.diagnostic-values div {
+  min-width: 0;
+}
+
+.diagnostic-values dt {
+  overflow: hidden;
+  color: #a08a8b;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostic-values dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #644b4e;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .notice {
   position: fixed;
   z-index: 20;
@@ -340,6 +455,29 @@ body.has-candles .intro {
 
   .intro {
     top: 20%;
+  }
+
+  .diagnostics {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px));
+    left: max(10px, env(safe-area-inset-left));
+    padding: 8px 9px;
+  }
+
+  #spectrum {
+    height: 38px;
+  }
+
+  .diagnostic-values {
+    gap: 5px;
+  }
+
+  .diagnostic-values dt {
+    font-size: 7px;
+  }
+
+  .diagnostic-values dd {
+    font-size: 9px;
   }
 }
 
