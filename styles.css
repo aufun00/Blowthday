@@ -27,6 +27,8 @@ body {
 }
 
 body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   background:
     radial-gradient(circle at 15% 15%, rgba(255, 255, 255, 0.96) 0 6%, transparent 27%),
     radial-gradient(circle at 85% 8%, rgba(255, 205, 176, 0.52), transparent 29%),
@@ -210,9 +212,15 @@ body::before {
   z-index: 1;
 }
 
-main,
+main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 #scene {
-  position: fixed;
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -223,7 +231,7 @@ main,
 }
 
 .intro {
-  position: fixed;
+  position: absolute;
   z-index: 2;
   top: 22%;
   left: 50%;
@@ -265,7 +273,7 @@ body.has-candles .intro {
 }
 
 .status {
-  position: fixed;
+  position: absolute;
   z-index: 3;
   bottom: max(24px, calc(env(safe-area-inset-bottom) + 14px));
   left: 50%;
@@ -286,13 +294,13 @@ body.has-candles .intro {
 }
 
 .diagnostics {
-  position: fixed;
+  position: relative;
   z-index: 4;
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(78px, calc(env(safe-area-inset-bottom) + 68px));
-  left: max(16px, env(safe-area-inset-left));
+  align-self: end;
+  justify-self: center;
+  width: calc(100% - 32px);
   max-width: 680px;
-  margin: auto;
+  margin: 0 auto max(12px, env(safe-area-inset-bottom));
   padding: 10px 12px 9px;
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 17px;
@@ -403,8 +411,9 @@ body.has-candles .intro {
 .notice {
   position: fixed;
   z-index: 20;
+  top: max(82px, calc(env(safe-area-inset-top) + 72px));
   right: 16px;
-  bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px));
+  bottom: auto;
   left: 16px;
   max-width: 520px;
   margin: auto;
@@ -458,9 +467,8 @@ body.has-candles .intro {
   }
 
   .diagnostics {
-    right: max(10px, env(safe-area-inset-right));
-    bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px));
-    left: max(10px, env(safe-area-inset-left));
+    width: calc(100% - 20px);
+    margin-bottom: max(8px, env(safe-area-inset-bottom));
     padding: 8px 9px;
   }
 

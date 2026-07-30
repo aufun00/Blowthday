@@ -185,8 +185,9 @@ class BirthdayScene {
   }
 
   resize() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+    const bounds = this.canvas.getBoundingClientRect();
+    this.width = Math.max(1, bounds.width);
+    this.height = Math.max(1, bounds.height);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
@@ -342,8 +343,9 @@ class BirthdayScene {
     const radiusX = Math.min(this.width * 0.39, 310);
     const radiusY = Math.max(48, radiusX * 0.29);
     const centerX = this.width / 2;
-    const topY = clamp(this.height * 0.67, 310, this.height - 180);
-    const cakeHeight = clamp(this.height * 0.16, 92, 142);
+    const cakeHeight = clamp(this.height * 0.16, 78, 142);
+    const latestTop = this.height - cakeHeight - radiusY - 42;
+    const topY = Math.max(this.height * 0.42, Math.min(this.height * 0.64, latestTop));
     return { centerX, topY, radiusX, radiusY, cakeHeight };
   }
 
@@ -674,7 +676,7 @@ class BlowDetector {
       rms,
       zcr: percentile("zcr", 0.75),
       highRatio: percentile("highRatio", 0.75),
-      threshold: clamp(rms + Math.max(0.018, rms * 0.9), 0.022, 0.28)
+      threshold: clamp(rms * 1.65 + 0.004, 0.008, 0.18)
     };
   }
 

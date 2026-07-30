@@ -43,25 +43,26 @@
       <p>点燃蜡烛，然后轻轻吹气</p>
     </section>
 
-    <aside class="diagnostics" aria-label="麦克风实时诊断">
-      <div class="diagnostics-head">
-        <span>MIC SPECTRUM</span>
-        <strong id="diagnostic-state" data-state="idle">等待麦克风</strong>
-      </div>
-      <canvas id="spectrum" aria-label="实时麦克风频谱"></canvas>
-      <div class="rms-meter" aria-hidden="true">
-        <span id="rms-fill" class="rms-fill"></span>
-        <i id="rms-threshold" class="rms-threshold"></i>
-      </div>
-      <dl class="diagnostic-values">
-        <div><dt>RMS / 阈值</dt><dd id="metric-rms">-- / --</dd></div>
-        <div><dt>高频 / 基线</dt><dd id="metric-high">-- / --</dd></div>
-        <div><dt>ZCR / 基线</dt><dd id="metric-zcr">-- / --</dd></div>
-        <div><dt>候选持续</dt><dd id="metric-hold">0 / 150 ms</dd></div>
-      </dl>
-    </aside>
     <div id="status" class="status" role="status" aria-live="polite">设置数量，然后点燃蜡烛</div>
   </main>
+
+  <aside class="diagnostics" aria-label="麦克风实时诊断">
+    <div class="diagnostics-head">
+      <span>MIC SPECTRUM</span>
+      <strong id="diagnostic-state" data-state="idle">等待麦克风</strong>
+    </div>
+    <canvas id="spectrum" aria-label="实时麦克风频谱"></canvas>
+    <div class="rms-meter" aria-hidden="true">
+      <span id="rms-fill" class="rms-fill"></span>
+      <i id="rms-threshold" class="rms-threshold"></i>
+    </div>
+    <dl class="diagnostic-values">
+      <div><dt>RMS / 阈值</dt><dd id="metric-rms">-- / --</dd></div>
+      <div><dt>高频 / 基线</dt><dd id="metric-high">-- / --</dd></div>
+      <div><dt>ZCR / 基线</dt><dd id="metric-zcr">-- / --</dd></div>
+      <div><dt>候选持续</dt><dd id="metric-hold">0 / 150 ms</dd></div>
+    </dl>
+  </aside>
 
   <div id="notice" class="notice" role="alert" hidden></div>
 
