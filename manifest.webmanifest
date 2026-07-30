@@ -1,0 +1,20 @@
+{
+  "name": "Blowthday",
+  "short_name": "Blowthday",
+  "description": "吹灭属于你的生日蜡烛。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fff3dd",
+  "theme_color": "#fff3dd",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

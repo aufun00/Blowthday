@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff3dd">
+  <meta name="description" content="吹灭属于你的生日蜡烛。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Blowthday">
+  <title>Blowthday</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="controls" aria-label="蜡烛设置">
+    <div class="setup">
+      <label class="count-field" aria-label="蜡烛数量">
+        <span>数量</span>
+        <input id="candle-count" type="number" inputmode="numeric" min="1" max="120" value="18">
+      </label>
+
+      <label class="mode-control">
+        <span id="mode-left" class="mode-label is-active">多根</span>
+        <input id="candle-mode" type="checkbox" role="switch" aria-label="切换到数字蜡烛">
+        <span class="switch" aria-hidden="true"><span class="switch-thumb"></span></span>
+        <span id="mode-right" class="mode-label">数字</span>
+      </label>
+    </div>
+
+    <button id="light-button" class="light-button" type="button">
+      <span class="button-progress" aria-hidden="true"></span>
+      <span class="button-label">点蜡烛</span>
+    </button>
+  </header>
+
+  <main>
+    <canvas id="scene" aria-label="生日蛋糕和蜡烛"></canvas>
+    <section class="intro" aria-hidden="true">
+      <p class="eyebrow">MAKE A WISH</p>
+      <h1>Blowthday</h1>
+      <p>点燃蜡烛，然后轻轻吹气</p>
+    </section>
+    <div id="status" class="status" role="status" aria-live="polite">设置数量，然后点燃蜡烛</div>
+  </main>
+
+  <div id="notice" class="notice" role="alert" hidden></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
